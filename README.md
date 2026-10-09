@@ -2,7 +2,7 @@ REPOSITORY TUGAS DEVOPS dan CI/CD
 
 Kelompok :
 
-1.
+1. Raka Tegar Pamungkas - 06.2023.1.07744
 2. Ubay Lahmudien Maghfirly - 06.2023.1.07710
 3. Timy Kakeru - 06.2023.1.07713
 
