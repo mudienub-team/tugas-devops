@@ -1,0 +1,34 @@
+default:
+  image: node:24
+  before_script:
+    - npm ci
+
+stages:
+  - lint
+  - test
+  - build
+
+variables:
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+
+cache:
+  key:
+    files:
+      - package-lock.json
+  paths:
+    - .npm/
+
+lint:
+  stage: lint
+  script:
+    - npm run lint
+
+test:
+  stage: test
+  script:
+    - npm test -- --ci
+
+build:
+  stage: build
+  script:
+    - npm run build
