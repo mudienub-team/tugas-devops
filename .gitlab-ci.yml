@@ -1,7 +1,5 @@
-
-
 default:
-  image: node:24.18.0
+  image: node:24
   before_script:
     - npm ci
 
