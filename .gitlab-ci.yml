@@ -1,5 +1,7 @@
+
+
 default:
-  image: node:24
+  image: node:24.18.0
   before_script:
     - npm ci
 
@@ -15,8 +17,8 @@ cache:
   key:
     files:
       - package-lock.json
-    paths:
-      - .npm/
+  paths:
+    - .npm/
 
 lint:
   stage: lint
