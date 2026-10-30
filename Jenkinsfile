@@ -35,20 +35,25 @@ pipeline {
                 sh '''
                     set -eu
 
+                    # Validasi hasil build
+                    test -f .next/standalone/server.js
+
                     mkdir -p "$DEPLOY_DIR"
 
-                    # Salin hasil standalone
+                    # Salin standalone
                     rsync -a --delete \
                       .next/standalone/ "$DEPLOY_DIR/"
 
                     # Salin aset statis
                     mkdir -p "$DEPLOY_DIR/.next/static"
+
                     rsync -a --delete \
                       .next/static/ "$DEPLOY_DIR/.next/static/"
 
                     # Salin public jika tersedia
                     if [ -d public ]; then
                       mkdir -p "$DEPLOY_DIR/public"
+
                       rsync -a --delete \
                         public/ "$DEPLOY_DIR/public/"
                     fi
@@ -56,9 +61,17 @@ pipeline {
                     # Salin konfigurasi PM2
                     cp ecosystem.config.cjs "$DEPLOY_DIR/"
 
+                    # Validasi hasil deployment
+                    test -f "$DEPLOY_DIR/server.js"
+
+                    # Hapus konfigurasi aplikasi lama jika masih terdaftar
+                    pm2 delete next-app || true
+
                     # Jalankan atau restart aplikasi
                     cd "$DEPLOY_DIR"
+
                     pm2 startOrReload ecosystem.config.cjs --update-env
+
                     pm2 save
                 '''
             }
@@ -75,4 +88,3 @@ pipeline {
         }
     }
 }
-
