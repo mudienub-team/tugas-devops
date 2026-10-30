@@ -8,6 +8,7 @@ const config: Config = {
   transform: {
     ...tsJestTransformCfg,
   },
+  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/e2e/"],
 };
 
 export default config;
