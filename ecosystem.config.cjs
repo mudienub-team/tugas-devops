@@ -1,13 +1,15 @@
 module.exports = {
   apps: [
     {
-      name: "next-app",
-      script: ".next/standalone/server.js",
+      name: "tugas-devops",
+      script: "server.js",
       cwd: "/var/lib/jenkins/apps/tugas-devops",
+      instances: 1,
+      exec_mode: "fork",
       env: {
         NODE_ENV: "production",
-        PORT: 3000,
         HOSTNAME: "0.0.0.0",
+        PORT: 3000,
       },
     },
   ],
