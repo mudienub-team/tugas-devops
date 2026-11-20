@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-
   pull_request:
     branches:
       - main
@@ -76,47 +75,55 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          DATABASE_URL: "mysql://root:root@localhost:3306/todos_db"
         run: npm run build
 
-      # prepare deployment package
-      - name: Prepare Artifact
-        if: github.event_name == 'push'
-        run: |
-          mkdir -p deploy-package
+  docker-build:
+    name: Docker Build Test
+    needs:
+      - lint
+      - unit-test
 
-          cp -a .next/standalone/. deploy-package/
+    runs-on: ubuntu-latest
 
-          mkdir -p deploy-package/.next/static
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-          cp -a .next/static/. \
-            deploy-package/.next/static/
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-          if [ -d public ]; then
-            cp -a public deploy-package/
-          fi
-
-          cp ecosystem.config.cjs deploy-package/
-
-      # upload artifact
-      - name: Upload Artifact
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v4
+      - name: Build Docker Image
+        uses: docker/build-push-action@v5
         with:
-          name: nextjs-production
-          path: deploy-package/
-          retention-days: 7
+          context: .
+          push: false
+          tags: tugas-devops:latest
 
-      # trigger jenkins
-      - name: Trigger Jenkins CD
-        if: github.event_name == 'push'
+  trigger-jenkins:
+    name: Trigger Jenkins CD
+    needs:
+      - build
+      - docker-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Jenkins
         env:
           JENKINS_URL: ${{ secrets.JENKINS_URL }}
           JENKINS_USER: ${{ secrets.JENKINS_USER }}
           JENKINS_API_TOKEN: ${{ secrets.JENKINS_API_TOKEN }}
 
         run: |
-          curl -fsS -X POST \
-            --user "$JENKINS_USER:$JENKINS_API_TOKEN" \
-            --data-urlencode "RUN_ID=$GITHUB_RUN_ID" \
-            --data-urlencode "COMMIT_SHA=$GITHUB_SHA" \
-            "$JENKINS_URL/job/tugas-devops/buildWithParameters"
+          if [ -n "$JENKINS_URL" ] && [ -n "$JENKINS_USER" ] && [ -n "$JENKINS_API_TOKEN" ]; then
+            curl -fsS -X POST \
+              --user "$JENKINS_USER:$JENKINS_API_TOKEN" \
+              --data-urlencode "RUN_ID=$GITHUB_RUN_ID" \
+              --data-urlencode "COMMIT_SHA=$GITHUB_SHA" \
+              "$JENKINS_URL/job/tugas-devops/buildWithParameters"
+          else
+            echo "Jenkins secrets are not configured, skipping webhook trigger."
+          fi
