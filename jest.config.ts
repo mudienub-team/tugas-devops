@@ -12,7 +12,7 @@ const config: Config = {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   modulePathIgnorePatterns: ["<rootDir>/.next/"],
-  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/e2e/"],
+  testPathIgnorePatterns: ["<rootDir>/node_modules/"],
 };
 
 export default config;
