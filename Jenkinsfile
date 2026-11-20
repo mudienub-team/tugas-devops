@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -8,7 +7,7 @@ pipeline {
     }
 
     environment {
-        DEPLOY_DIR = '/var/lib/jenkins/apps/tugas-devops'
+        APP_NAME = 'tugas-devops'
     }
 
     stages {
@@ -18,61 +17,66 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Test') {
             steps {
-                sh 'npm ci'
+                sh '''
+                    npm ci
+                    npm test
+                '''
             }
         }
 
-        stage('Build') {
-            steps {
-                sh 'npm run build'
-            }
-        }
-
-        stage('Deploy') {
+        stage('Docker Compose Deploy') {
             steps {
                 sh '''
                     set -eu
 
-                    # Validasi hasil build
-                    test -f .next/standalone/server.js
+                    echo "=== Deploying with Docker Compose ==="
 
-                    mkdir -p "$DEPLOY_DIR"
-
-                    # Salin standalone
-                    rsync -a --delete \
-                      .next/standalone/ "$DEPLOY_DIR/"
-
-                    # Salin aset statis
-                    mkdir -p "$DEPLOY_DIR/.next/static"
-
-                    rsync -a --delete \
-                      .next/static/ "$DEPLOY_DIR/.next/static/"
-
-                    # Salin public jika tersedia
-                    if [ -d public ]; then
-                      mkdir -p "$DEPLOY_DIR/public"
-
-                      rsync -a --delete \
-                        public/ "$DEPLOY_DIR/public/"
+                    # Deteksi perintah Docker Compose yang tersedia
+                    if docker compose version >/dev/null 2>&1; then
+                        DOCKER_COMPOSE="docker compose"
+                    elif command -v docker-compose >/dev/null 2>&1; then
+                        DOCKER_COMPOSE="docker-compose"
+                    else
+                        echo "Error: Docker Compose tidak ditemukan di runner Jenkins!"
+                        exit 1
                     fi
 
-                    # Salin konfigurasi PM2
-                    cp ecosystem.config.cjs "$DEPLOY_DIR/"
+                    # Pastikan file .env ada
+                    if [ ! -f .env ]; then
+                        if [ -f .env.example ]; then
+                            cp .env.example .env
+                        else
+                            touch .env
+                        fi
+                    fi
 
-                    # Validasi hasil deployment
-                    test -f "$DEPLOY_DIR/server.js"
+                    # Jalankan deploy ulang container
+                    $DOCKER_COMPOSE down --remove-orphans || true
+                    $DOCKER_COMPOSE up -d --build
 
-                    # Hapus konfigurasi aplikasi lama jika masih terdaftar
-                    pm2 delete next-app || true
+                    # Validasi status kontainer
+                    $DOCKER_COMPOSE ps
+                '''
+            }
+        }
 
-                    # Jalankan atau restart aplikasi
-                    cd "$DEPLOY_DIR"
+        stage('Health Check') {
+            steps {
+                sh '''
+                    set -eu
 
-                    pm2 startOrReload ecosystem.config.cjs --update-env
+                    echo "=== Verifikasi Health Check ==="
+                    sleep 10
 
-                    pm2 save
+                    # Verifikasi respons dari HTTP port 3000
+                    curl -fsS http://localhost:3000/ > /dev/null || curl -fsS http://127.0.0.1:3000/ > /dev/null || {
+                        echo "Gagal menghubungi aplikasi di port 3000"
+                        exit 1
+                    }
+
+                    echo "Aplikasi berhasil berjalan dan merespons dengan baik!"
                 '''
             }
         }
@@ -80,11 +84,18 @@ pipeline {
 
     post {
         success {
-            echo 'Deployment berhasil!'
+            echo 'Deployment dengan Docker Compose berhasil!'
         }
 
         failure {
-            echo 'Deployment gagal. Periksa log pipeline.'
+            echo 'Deployment gagal. Menampilkan log kontainer:'
+            sh '''
+                if docker compose version >/dev/null 2>&1; then
+                    docker compose logs --tail=50 || true
+                elif command -v docker-compose >/dev/null 2>&1; then
+                    docker-compose logs --tail=50 || true
+                fi
+            '''
         }
     }
 }
