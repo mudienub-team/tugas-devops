@@ -6,6 +6,11 @@ pipeline {
         disableConcurrentBuilds()
     }
 
+    // Dipicu oleh webhook GitHub (Payload URL: <JENKINS_URL>/github-webhook/)
+    triggers {
+        githubPush()
+    }
+
     environment {
         APP_NAME = 'tugas-devops'
     }
@@ -28,10 +33,16 @@ pipeline {
 
         stage('Docker Compose Deploy') {
             steps {
+                // File .env disimpan di Jenkins Credentials (tipe: Secret file), bukan di repo
+                withCredentials([file(credentialsId: 'tugas-devops-env', variable: 'ENV_FILE')]) {
                 sh '''
                     set -eu
 
                     echo "=== Deploying with Docker Compose ==="
+
+                    # Salin secret file ke workspace sebagai .env
+                    cp "$ENV_FILE" .env
+                    chmod 600 .env
 
                     # Deteksi perintah Docker Compose yang tersedia
                     if docker compose version >/dev/null 2>&1; then
@@ -43,14 +54,10 @@ pipeline {
                         exit 1
                     fi
 
-                    # Pastikan file .env ada
-                    if [ ! -f .env ]; then
-                        if [ -f .env.example ]; then
-                            cp .env.example .env
-                        else
-                            touch .env
-                        fi
-                    fi
+                    # Versi image diambil dari package.json
+                    APP_VERSION=$(node -p "require('./package.json').version")
+                    export APP_VERSION
+                    echo "Versi aplikasi: $APP_VERSION"
 
                     # Jalankan deploy ulang container
                     $DOCKER_COMPOSE down --remove-orphans || true
@@ -59,6 +66,7 @@ pipeline {
                     # Validasi status kontainer
                     $DOCKER_COMPOSE ps
                 '''
+                }
             }
         }
 
@@ -90,12 +98,18 @@ pipeline {
         failure {
             echo 'Deployment gagal. Menampilkan log kontainer:'
             sh '''
+                export APP_VERSION=$(node -p "require('./package.json').version")
                 if docker compose version >/dev/null 2>&1; then
                     docker compose logs --tail=50 || true
                 elif command -v docker-compose >/dev/null 2>&1; then
                     docker-compose logs --tail=50 || true
                 fi
             '''
+        }
+
+        // Dijalankan paling akhir: hapus .env dari workspace agar tidak tertinggal di disk
+        cleanup {
+            sh 'rm -f .env'
         }
     }
 }
