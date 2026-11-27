@@ -3,18 +3,23 @@ services:
     build:
       context: ./docker
       dockerfile: Dockerfile
-    image: tugas-devops-db
+    image: tugas-devops-db:${APP_VERSION:?APP_VERSION belum di-set, jalankan lewat npm run docker:up}
     container_name: tugas-devops-db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: todos_db
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD belum di-set di .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE belum di-set di .env}
     ports:
-      - "3306:3306"
+      - "${DB_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -proot || exit 1"]
+      # $$ supaya diekspansi di dalam container, bukan oleh compose
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -26,16 +31,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tugas-devops-app
+      args:
+        APP_VERSION: ${APP_VERSION}
+        DATABASE_URL: ${DATABASE_URL}
+    image: tugas-devops-app:${APP_VERSION}
     container_name: tugas-devops-app
     restart: always
     ports:
-      - "3000:3000"
+      - "${APP_PORT}:${APP_PORT}"
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - HOSTNAME=0.0.0.0
-      - DATABASE_URL=mysql://root:root@db:3306/todos_db
+      NODE_ENV: ${NODE_ENV}
+      PORT: ${APP_PORT}
+      HOSTNAME: ${APP_HOSTNAME}
+      # Di dalam jaringan compose host database adalah nama service "db"
+      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD}@db:3306/${MYSQL_DATABASE}
     depends_on:
       db:
         condition: service_healthy

@@ -10,7 +10,9 @@
     "test": "jest",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "docker:up": "APP_VERSION=$(node -p \"require('./package.json').version\") docker compose up -d --build",
+    "docker:down": "APP_VERSION=$(node -p \"require('./package.json').version\") docker compose down"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

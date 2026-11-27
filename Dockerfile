@@ -22,9 +22,10 @@ COPY . .
 # Ensure public directory exists
 RUN mkdir -p /app/public
 
-# Disable telemetry and set build-time environment variables for Prisma
+# Disable telemetry. DATABASE_URL dikirim dari luar (build arg), tidak ditulis di sini
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV DATABASE_URL="mysql://root:root@localhost:3306/todos_db"
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
 
 RUN npx prisma generate
 RUN npm run build
@@ -34,10 +35,13 @@ FROM base AS runner
 RUN apk add --no-cache openssl curl
 WORKDIR /app
 
+# Versi image mengikuti "version" di package.json (dikirim lewat build arg)
+ARG APP_VERSION
+LABEL org.opencontainers.image.version="${APP_VERSION}"
+
+# PORT, HOSTNAME, dan DATABASE_URL diberikan saat runtime (docker-compose / docker run -e)
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
